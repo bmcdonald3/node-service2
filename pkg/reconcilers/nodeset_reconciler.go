@@ -1,10 +1,11 @@
+// Copyright © 2025 OpenCHAMI a Series of LF Projects, LLC
+// SPDX-License-Identifier: MIT
+
 package reconcilers
 
 import (
 	"context"
-	"time"
 
-	"github.com/openchami/fabrica/pkg/reconcile"
 	v1 "github.com/user/node-service/apis/node.openchami.io/v1"
 )
 
@@ -21,27 +22,18 @@ func (m *MockSMDClient) GetNodesByLabels(labels map[string]string) ([]string, er
 	return []string{}, nil
 }
 
-type NodeSetReconciler struct {
-	reconcile.BaseReconciler
-	SMD SMDClient
-}
+var smdClient = &MockSMDClient{}
 
-func (r *NodeSetReconciler) Reconcile(ctx context.Context, resource interface{}) (reconcile.Result, error) {
-	if r.SMD == nil {
-		r.SMD = &MockSMDClient{}
-	}
-
-	nodeSet := resource.(*v1.NodeSet)
-
+func (r *NodeSetReconciler) reconcileNodeSet(ctx context.Context, res *v1.NodeSet) error {
 	var resolved []string
-	resolved = append(resolved, nodeSet.Spec.Xnames...)
+	resolved = append(resolved, res.Spec.Xnames...)
 
-	if len(nodeSet.Spec.LabelSelector) > 0 {
-		smdNodes, err := r.SMD.GetNodesByLabels(nodeSet.Spec.LabelSelector)
+	if len(res.Spec.LabelSelector) > 0 {
+		smdNodes, err := smdClient.GetNodesByLabels(res.Spec.LabelSelector)
 		if err != nil {
-			nodeSet.Status.Phase = "Error"
-			r.UpdateStatus(ctx, nodeSet)
-			return reconcile.Result{RequeueAfter: 1 * time.Minute}, err
+			res.Status.Phase = "Error"
+			r.UpdateStatus(ctx, res)
+			return err 
 		}
 		resolved = append(resolved, smdNodes...)
 	}
@@ -55,17 +47,13 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, resource interface{})
 		}
 	}
 
-	if len(nodeSet.Status.ResolvedXnames) != len(finalResolved) || nodeSet.Status.Phase != "Resolved" {
-		nodeSet.Status.ResolvedXnames = finalResolved
-		nodeSet.Status.MatchCount = len(finalResolved)
-		nodeSet.Status.Phase = "Resolved"
-		r.UpdateStatus(ctx, nodeSet)
-		r.EmitEvent(ctx, "io.openchami.nodeset.resolved", nodeSet)
+	if len(res.Status.ResolvedXnames) != len(finalResolved) || res.Status.Phase != "Resolved" {
+		res.Status.ResolvedXnames = finalResolved
+		res.Status.MatchCount = len(finalResolved)
+		res.Status.Phase = "Resolved"
+		r.UpdateStatus(ctx, res)
+		r.EmitEvent(ctx, "io.openchami.nodeset.resolved", res)
 	}
 
-	return reconcile.Result{RequeueAfter: 5 * time.Minute}, nil
-}
-
-func (r *NodeSetReconciler) GetResourceKind() string {
-	return "NodeSet"
+	return nil
 }
