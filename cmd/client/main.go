@@ -278,13 +278,15 @@ var nodeCreateCmd = &cobra.Command{
 
 Examples:
   # Create from stdin
-  echo '{"description": "Example description"}' | client node create
+  echo '{"xname": "example-name", "role": "example-value", "labels": {"{"key":"value"}": "value"}}' | client node create
 
   # Create with --spec flag
-  client node create --spec '{"description": "Example description"}'
+  client node create --spec '{"xname": "example-name", "role": "example-value", "labels": {"{"key":"value"}": "value"}}'
 
 Spec fields:
-  description (string)
+  xname (string) [required]
+  role (string)
+  labels (map[string]string)
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := getClient()
@@ -328,13 +330,15 @@ var nodeUpdateCmd = &cobra.Command{
 
 Examples:
   # Update from stdin
-  echo '{"description": "Example description"}' | client node update <uid>
+  echo '{"xname": "example-name", "role": "example-value", "labels": {"{"key":"value"}": "value"}}' | client node update <uid>
 
   # Update with --spec flag
-  client node update <uid> --spec '{"description": "Example description"}'
+  client node update <uid> --spec '{"xname": "example-name", "role": "example-value", "labels": {"{"key":"value"}": "value"}}'
 
 Spec fields:
-  description (string)
+  xname (string) [required]
+  role (string)
+  labels (map[string]string)
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -612,13 +616,14 @@ var nodesetCreateCmd = &cobra.Command{
 
 Examples:
   # Create from stdin
-  echo '{"description": "Example description"}' | client nodeset create
+  echo '{"xnames": ["["item1","item2"]"], "labelSelector": {"{"key":"value"}": "value"}}' | client nodeset create
 
   # Create with --spec flag
-  client nodeset create --spec '{"description": "Example description"}'
+  client nodeset create --spec '{"xnames": ["["item1","item2"]"], "labelSelector": {"{"key":"value"}": "value"}}'
 
 Spec fields:
-  description (string)
+  xnames ([]string)
+  labelSelector (map[string]string)
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := getClient()
@@ -662,13 +667,14 @@ var nodesetUpdateCmd = &cobra.Command{
 
 Examples:
   # Update from stdin
-  echo '{"description": "Example description"}' | client nodeset update <uid>
+  echo '{"xnames": ["["item1","item2"]"], "labelSelector": {"{"key":"value"}": "value"}}' | client nodeset update <uid>
 
   # Update with --spec flag
-  client nodeset update <uid> --spec '{"description": "Example description"}'
+  client nodeset update <uid> --spec '{"xnames": ["["item1","item2"]"], "labelSelector": {"{"key":"value"}": "value"}}'
 
 Spec fields:
-  description (string)
+  xnames ([]string)
+  labelSelector (map[string]string)
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -946,13 +952,16 @@ var profilebindingCreateCmd = &cobra.Command{
 
 Examples:
   # Create from stdin
-  echo '{"description": "Example description"}' | client profilebinding create
+  echo '{"targetKind": "example-value", "targetName": "example-name", "profile": "example-value", "bootProfileOverride": "example-value"}' | client profilebinding create
 
   # Create with --spec flag
-  client profilebinding create --spec '{"description": "Example description"}'
+  client profilebinding create --spec '{"targetKind": "example-value", "targetName": "example-name", "profile": "example-value", "bootProfileOverride": "example-value"}'
 
 Spec fields:
-  description (string)
+  targetKind (string) [required]
+  targetName (string) [required]
+  profile (string) [required]
+  bootProfileOverride (string)
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := getClient()
@@ -996,13 +1005,16 @@ var profilebindingUpdateCmd = &cobra.Command{
 
 Examples:
   # Update from stdin
-  echo '{"description": "Example description"}' | client profilebinding update <uid>
+  echo '{"targetKind": "example-value", "targetName": "example-name", "profile": "example-value", "bootProfileOverride": "example-value"}' | client profilebinding update <uid>
 
   # Update with --spec flag
-  client profilebinding update <uid> --spec '{"description": "Example description"}'
+  client profilebinding update <uid> --spec '{"targetKind": "example-value", "targetName": "example-name", "profile": "example-value", "bootProfileOverride": "example-value"}'
 
 Spec fields:
-  description (string)
+  targetKind (string) [required]
+  targetName (string) [required]
+  profile (string) [required]
+  bootProfileOverride (string)
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
