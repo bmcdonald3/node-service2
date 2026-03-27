@@ -1,79 +1,92 @@
-// Copyright © 2025 OpenCHAMI a Series of LF Projects, LLC
-//
-// SPDX-License-Identifier: MIT
-// This file contains user-customizable reconciliation logic for ProfileBinding.
-//
-// ⚠️ This file is safe to edit - it will NOT be overwritten by code generation.
 package reconcilers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
 
-	"github.com/user/node-service/apis/node.openchami.io/v1"
+	"github.com/openchami/fabrica/pkg/reconcile"
+	v1 "github.com/user/node-service/apis/node.openchami.io/v1"
 )
 
-// reconcileProfileBinding contains custom reconciliation logic.
-//
-// This method is called by the generated Reconcile() orchestration method.
-// Implement ProfileBinding-specific reconciliation logic here.
-//
-// Guidelines:
-//  1. Keep this method idempotent (safe to call multiple times)
-//  2. Update Status fields to reflect observed state
-//  3. Emit events for significant state changes using r.EmitEvent()
-//  4. Use r.Logger for debugging (Infof, Warnf, Errorf, Debugf)
-//  5. Return errors for transient failures (will retry with backoff)
-//  6. Access storage via r.Client (Get, List, Update, Create, Delete)
-//
-// Example implementation patterns:
-//
-// For hardware resources (BMC, Node):
-//   - Connect to hardware endpoint
-//   - Query current state
-//   - Update Status.Connected, Status.Version, Status.Health
-//   - Emit events when state changes
-//
-// For hierarchical resources (Rack, Chassis):
-//   - Create/reconcile child resources
-//   - Update Status with child counts and references
-//   - Emit events when topology changes
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeouts
-//   - res: The ProfileBinding resource to reconcile
-//
-// Returns:
-//   - error: If reconciliation failed (will trigger retry with backoff)
-func (r *ProfileBindingReconciler) reconcileProfileBinding(ctx context.Context, res *v1.ProfileBinding) error {
-	// TODO: Implement ProfileBinding-specific reconciliation logic
-	//
-	// Example:
-	//
-	//   // 1. Read desired state from Spec
-	//   desiredAddress := res.Spec.Address
-	//
-	//   // 2. Observe actual state (e.g., connect to hardware)
-	//   actualState, err := r.observeActualState(ctx, res)
-	//   if err != nil {
-	//       return fmt.Errorf("failed to observe state: %w", err)
-	//   }
-	//
-	//   // 3. Update Status with observed state
-	//   res.Status.Connected = actualState.Connected
-	//   res.Status.Version = actualState.Version
-	//   res.Status.LastSeen = time.Now().Format(time.RFC3339)
-	//
-	//   // 4. Emit events for significant changes
-	//   if !wasConnected && res.Status.Connected {
-	//       eventType := "io.openchami.inventory.profilebindings.connected"
-	//       if err := r.EmitEvent(ctx, eventType, res); err != nil {
-	//           r.Logger.Warnf("Failed to emit event: %v", err)
-	//       }
-	//   }
-	//
-	//   return nil
+type DownstreamClient interface {
+	ApplyProfile(ctx context.Context, targetName, profile string) error
+}
 
-	r.Logger.Infof("ProfileBinding reconciliation not yet implemented for %s", res.GetUID())
+type HTTPDownstreamClient struct {
+	BaseURL    string
+	HTTPClient *http.Client
+}
 
+func (c *HTTPDownstreamClient) ApplyProfile(ctx context.Context, targetName, profile string) error {
+	payload := map[string]string{"profile": profile}
+	body, _ := json.Marshal(payload)
+	
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("%s/bindings/%s", c.BaseURL, targetName), bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("downstream returned status %d", resp.StatusCode)
+	}
 	return nil
+}
+
+type ProfileBindingReconciler struct {
+	reconcile.BaseReconciler
+	MetadataClient DownstreamClient
+	BootClient     DownstreamClient
+}
+
+func (r *ProfileBindingReconciler) Reconcile(ctx context.Context, resource interface{}) (reconcile.Result, error) {
+	if r.MetadataClient == nil {
+		r.MetadataClient = &HTTPDownstreamClient{BaseURL: "http://localhost:8081", HTTPClient: &http.Client{}}
+	}
+	if r.BootClient == nil {
+		r.BootClient = &HTTPDownstreamClient{BaseURL: "http://localhost:8081", HTTPClient: &http.Client{}}
+	}
+
+	binding := resource.(*v1.ProfileBinding)
+
+	if !binding.Status.MaterializedMetadata {
+		err := r.MetadataClient.ApplyProfile(ctx, binding.Spec.TargetName, binding.Spec.Profile)
+		if err != nil {
+			binding.Status.Phase = "MetadataError"
+			r.UpdateStatus(ctx, binding)
+			return reconcile.Result{RequeueAfter: 10 * time.Second}, err
+		}
+		binding.Status.MaterializedMetadata = true
+	}
+
+	if !binding.Status.MaterializedBoot {
+		err := r.BootClient.ApplyProfile(ctx, binding.Spec.TargetName, binding.Spec.Profile)
+		if err != nil {
+			binding.Status.Phase = "BootError"
+			r.UpdateStatus(ctx, binding)
+			return reconcile.Result{RequeueAfter: 10 * time.Second}, err
+		}
+		binding.Status.MaterializedBoot = true
+	}
+
+	if binding.Status.MaterializedBoot && binding.Status.MaterializedMetadata {
+		binding.Status.Phase = "Bound"
+	}
+
+	r.UpdateStatus(ctx, binding)
+	return reconcile.Result{}, nil
+}
+
+func (r *ProfileBindingReconciler) GetResourceKind() string {
+	return "ProfileBinding"
 }
