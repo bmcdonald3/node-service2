@@ -5,42 +5,31 @@
 package v1
 
 import (
-	"context"
-	"github.com/openchami/fabrica/pkg/fabrica"
+    "context"
+    "github.com/openchami/fabrica/pkg/fabrica"
 )
 
-// NodeSet represents a nodeset resource
 type NodeSet struct {
-	APIVersion string           `json:"apiVersion"`
-	Kind       string           `json:"kind"`
-	Metadata   fabrica.Metadata `json:"metadata"`
-	Spec       NodeSetSpec   `json:"spec" validate:"required"`
-	Status     NodeSetStatus `json:"status,omitempty"`
+    APIVersion string           `json:"apiVersion"`
+    Kind       string           `json:"kind"`
+    Metadata   fabrica.Metadata `json:"metadata"`
+    Spec       NodeSetSpec      `json:"spec" validate:"required"`
+    Status     NodeSetStatus    `json:"status,omitempty"`
 }
 
-// NodeSetSpec defines the desired state of NodeSet
 type NodeSetSpec struct {
-	Description string `json:"description,omitempty" validate:"max=200"`
-	// Add your spec fields here
+    Xnames        []string          `json:"xnames,omitempty"`
+    LabelSelector map[string]string `json:"labelSelector,omitempty"`
 }
 
-// NodeSetStatus defines the observed state of NodeSet
 type NodeSetStatus struct {
-	Phase      string `json:"phase,omitempty"`
-	Message    string `json:"message,omitempty"`
-	Ready      bool   `json:"ready"`
-		// Add your status fields here
+    ResolvedXnames []string `json:"resolvedXnames,omitempty"`
+    MatchCount     int      `json:"matchCount"`
+    Phase          string   `json:"phase,omitempty"`
 }
 
-// Validate implements custom validation logic for NodeSet
-func (r *NodeSet) Validate(ctx context.Context) error {
-	// Add custom validation logic here
-	// Example:
-	// if r.Spec.Description == "forbidden" {
-	//     return errors.New("description 'forbidden' is not allowed")
-	// }
-
-	return nil
+func (ns *NodeSet) Validate(ctx context.Context) error {
+    return nil
 }
 // GetKind returns the kind of the resource
 func (r *NodeSet) GetKind() string {

@@ -5,42 +5,33 @@
 package v1
 
 import (
-	"context"
-	"github.com/openchami/fabrica/pkg/fabrica"
+    "context"
+    "github.com/openchami/fabrica/pkg/fabrica"
 )
 
-// ProfileBinding represents a profilebinding resource
 type ProfileBinding struct {
-	APIVersion string           `json:"apiVersion"`
-	Kind       string           `json:"kind"`
-	Metadata   fabrica.Metadata `json:"metadata"`
-	Spec       ProfileBindingSpec   `json:"spec" validate:"required"`
-	Status     ProfileBindingStatus `json:"status,omitempty"`
+    APIVersion string               `json:"apiVersion"`
+    Kind       string               `json:"kind"`
+    Metadata   fabrica.Metadata     `json:"metadata"`
+    Spec       ProfileBindingSpec   `json:"spec" validate:"required"`
+    Status     ProfileBindingStatus `json:"status,omitempty"`
 }
 
-// ProfileBindingSpec defines the desired state of ProfileBinding
 type ProfileBindingSpec struct {
-	Description string `json:"description,omitempty" validate:"max=200"`
-	// Add your spec fields here
+    TargetKind          string `json:"targetKind" validate:"required,oneof=Node NodeSet"`
+    TargetName          string `json:"targetName" validate:"required"`
+    Profile             string `json:"profile" validate:"required"`
+    BootProfileOverride string `json:"bootProfileOverride,omitempty"`
 }
 
-// ProfileBindingStatus defines the observed state of ProfileBinding
 type ProfileBindingStatus struct {
-	Phase      string `json:"phase,omitempty"`
-	Message    string `json:"message,omitempty"`
-	Ready      bool   `json:"ready"`
-		// Add your status fields here
+    MaterializedBoot     bool   `json:"materializedBoot"`
+    MaterializedMetadata bool   `json:"materializedMetadata"`
+    Phase                string `json:"phase,omitempty"`
 }
 
-// Validate implements custom validation logic for ProfileBinding
-func (r *ProfileBinding) Validate(ctx context.Context) error {
-	// Add custom validation logic here
-	// Example:
-	// if r.Spec.Description == "forbidden" {
-	//     return errors.New("description 'forbidden' is not allowed")
-	// }
-
-	return nil
+func (pb *ProfileBinding) Validate(ctx context.Context) error {
+    return nil
 }
 // GetKind returns the kind of the resource
 func (r *ProfileBinding) GetKind() string {

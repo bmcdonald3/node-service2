@@ -5,43 +5,33 @@
 package v1
 
 import (
-	"context"
-	"github.com/openchami/fabrica/pkg/fabrica"
+    "context"
+    "github.com/openchami/fabrica/pkg/fabrica"
 )
 
-// Node represents a node resource
 type Node struct {
-	APIVersion string           `json:"apiVersion"`
-	Kind       string           `json:"kind"`
-	Metadata   fabrica.Metadata `json:"metadata"`
-	Spec       NodeSpec   `json:"spec" validate:"required"`
-	Status     NodeStatus `json:"status,omitempty"`
+    APIVersion string           `json:"apiVersion"`
+    Kind       string           `json:"kind"`
+    Metadata   fabrica.Metadata `json:"metadata"`
+    Spec       NodeSpec         `json:"spec" validate:"required"`
+    Status     NodeStatus       `json:"status,omitempty"`
 }
 
-// NodeSpec defines the desired state of Node
 type NodeSpec struct {
-	Description string `json:"description,omitempty" validate:"max=200"`
-	// Add your spec fields here
+    Xname  string            `json:"xname" validate:"required"`
+    Role   string            `json:"role,omitempty"`
+    Labels map[string]string `json:"labels,omitempty" validate:"dive,keys,labelkey,endkeys,labelvalue"`
 }
 
-// NodeStatus defines the observed state of Node
 type NodeStatus struct {
-	Phase      string `json:"phase,omitempty"`
-	Message    string `json:"message,omitempty"`
-	Ready      bool   `json:"ready"`
-		// Add your status fields here
+    EffectiveProfile string `json:"effectiveProfile,omitempty"`
+    Phase            string `json:"phase,omitempty"`
 }
 
-// Validate implements custom validation logic for Node
-func (r *Node) Validate(ctx context.Context) error {
-	// Add custom validation logic here
-	// Example:
-	// if r.Spec.Description == "forbidden" {
-	//     return errors.New("description 'forbidden' is not allowed")
-	// }
-
-	return nil
+func (n *Node) Validate(ctx context.Context) error {
+    return nil
 }
+
 // GetKind returns the kind of the resource
 func (r *Node) GetKind() string {
 	return "Node"
