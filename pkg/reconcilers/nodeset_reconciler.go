@@ -1,79 +1,71 @@
-// Copyright © 2025 OpenCHAMI a Series of LF Projects, LLC
-//
-// SPDX-License-Identifier: MIT
-// This file contains user-customizable reconciliation logic for NodeSet.
-//
-// ⚠️ This file is safe to edit - it will NOT be overwritten by code generation.
 package reconcilers
 
 import (
 	"context"
+	"time"
 
-	"github.com/user/node-service/apis/node.openchami.io/v1"
+	"github.com/openchami/fabrica/pkg/reconcile"
+	v1 "github.com/user/node-service/apis/node.openchami.io/v1"
 )
 
-// reconcileNodeSet contains custom reconciliation logic.
-//
-// This method is called by the generated Reconcile() orchestration method.
-// Implement NodeSet-specific reconciliation logic here.
-//
-// Guidelines:
-//  1. Keep this method idempotent (safe to call multiple times)
-//  2. Update Status fields to reflect observed state
-//  3. Emit events for significant state changes using r.EmitEvent()
-//  4. Use r.Logger for debugging (Infof, Warnf, Errorf, Debugf)
-//  5. Return errors for transient failures (will retry with backoff)
-//  6. Access storage via r.Client (Get, List, Update, Create, Delete)
-//
-// Example implementation patterns:
-//
-// For hardware resources (BMC, Node):
-//   - Connect to hardware endpoint
-//   - Query current state
-//   - Update Status.Connected, Status.Version, Status.Health
-//   - Emit events when state changes
-//
-// For hierarchical resources (Rack, Chassis):
-//   - Create/reconcile child resources
-//   - Update Status with child counts and references
-//   - Emit events when topology changes
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeouts
-//   - res: The NodeSet resource to reconcile
-//
-// Returns:
-//   - error: If reconciliation failed (will trigger retry with backoff)
-func (r *NodeSetReconciler) reconcileNodeSet(ctx context.Context, res *v1.NodeSet) error {
-	// TODO: Implement NodeSet-specific reconciliation logic
-	//
-	// Example:
-	//
-	//   // 1. Read desired state from Spec
-	//   desiredAddress := res.Spec.Address
-	//
-	//   // 2. Observe actual state (e.g., connect to hardware)
-	//   actualState, err := r.observeActualState(ctx, res)
-	//   if err != nil {
-	//       return fmt.Errorf("failed to observe state: %w", err)
-	//   }
-	//
-	//   // 3. Update Status with observed state
-	//   res.Status.Connected = actualState.Connected
-	//   res.Status.Version = actualState.Version
-	//   res.Status.LastSeen = time.Now().Format(time.RFC3339)
-	//
-	//   // 4. Emit events for significant changes
-	//   if !wasConnected && res.Status.Connected {
-	//       eventType := "io.openchami.inventory.nodesets.connected"
-	//       if err := r.EmitEvent(ctx, eventType, res); err != nil {
-	//           r.Logger.Warnf("Failed to emit event: %v", err)
-	//       }
-	//   }
-	//
-	//   return nil
+type SMDClient interface {
+	GetNodesByLabels(labels map[string]string) ([]string, error)
+}
 
-	r.Logger.Infof("NodeSet reconciliation not yet implemented for %s", res.GetUID())
+type MockSMDClient struct{}
 
-	return nil
+func (m *MockSMDClient) GetNodesByLabels(labels map[string]string) ([]string, error) {
+	if labels["role"] == "compute" {
+		return []string{"x1000c0s1b0n0", "x1000c0s1b0n1"}, nil
+	}
+	return []string{}, nil
+}
+
+type NodeSetReconciler struct {
+	reconcile.BaseReconciler
+	SMD SMDClient
+}
+
+func (r *NodeSetReconciler) Reconcile(ctx context.Context, resource interface{}) (reconcile.Result, error) {
+	if r.SMD == nil {
+		r.SMD = &MockSMDClient{}
+	}
+
+	nodeSet := resource.(*v1.NodeSet)
+
+	var resolved []string
+	resolved = append(resolved, nodeSet.Spec.Xnames...)
+
+	if len(nodeSet.Spec.LabelSelector) > 0 {
+		smdNodes, err := r.SMD.GetNodesByLabels(nodeSet.Spec.LabelSelector)
+		if err != nil {
+			nodeSet.Status.Phase = "Error"
+			r.UpdateStatus(ctx, nodeSet)
+			return reconcile.Result{RequeueAfter: 1 * time.Minute}, err
+		}
+		resolved = append(resolved, smdNodes...)
+	}
+
+	uniqueMap := make(map[string]bool)
+	var finalResolved []string
+	for _, xname := range resolved {
+		if !uniqueMap[xname] {
+			uniqueMap[xname] = true
+			finalResolved = append(finalResolved, xname)
+		}
+	}
+
+	if len(nodeSet.Status.ResolvedXnames) != len(finalResolved) || nodeSet.Status.Phase != "Resolved" {
+		nodeSet.Status.ResolvedXnames = finalResolved
+		nodeSet.Status.MatchCount = len(finalResolved)
+		nodeSet.Status.Phase = "Resolved"
+		r.UpdateStatus(ctx, nodeSet)
+		r.EmitEvent(ctx, "io.openchami.nodeset.resolved", nodeSet)
+	}
+
+	return reconcile.Result{RequeueAfter: 5 * time.Minute}, nil
+}
+
+func (r *NodeSetReconciler) GetResourceKind() string {
+	return "NodeSet"
 }
